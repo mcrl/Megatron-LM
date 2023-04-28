@@ -29,7 +29,7 @@ from .utils import (
 
 
 def get_empty_index_path():
-    '''Path of empty index.'''
+    """Path of empty index."""
     args = get_retro_args()
     index = IndexFactory.get_index(args.retro_index_type)
     empty_index_path = index.get_empty_index_path()
@@ -37,11 +37,11 @@ def get_empty_index_path():
 
 
 def embed_db():
-    '''Embed DB chunks.
+    """Embed DB chunks.
 
     Store chunks in blocks on disk. These blocks will later be merged into
     a single dataset for training the index.
-    '''
+    """
 
     args = get_retro_args()
 
@@ -50,22 +50,24 @@ def embed_db():
     text_dataset = GPTToTextDataset(gpt_dataset)
 
     # Embed dataset.
-    embedder = DiskDataParallelBertEmbedder(args.retro_bert_batch_size,
-                                            args.retro_bert_max_chunk_length,
-                                            args.retro_block_size,
-                                            args.bert_embedder_type)
+    embedder = DiskDataParallelBertEmbedder(
+        args.retro_bert_batch_size,
+        args.retro_bert_max_chunk_length,
+        args.retro_block_size,
+        args.bert_embedder_type,
+    )
     embedder.embed_text_dataset("index", get_training_data_dir(), text_dataset)
 
 
 def train_on_embeddings():
-    '''Train index on embedded DB chunks.'''
+    """Train index on embedded DB chunks."""
     args = get_retro_args()
     index = IndexFactory.get_index(args.retro_index_type)
     index.train(get_training_data_merged)
 
 
 def remove_embeddings():
-    '''Remove embeddings after training.'''
+    """Remove embeddings after training."""
     torch.distributed.barrier()
     if torch.distributed.get_rank() != 0:
         return
@@ -75,13 +77,12 @@ def remove_embeddings():
 
 
 def train_index():
-    '''Train index on DB chunks.'''
+    """Train index on DB chunks."""
 
     args = get_retro_args()
 
     # Check if trained index already exists.
     if not os.path.isfile(get_empty_index_path()):
-
         # Embed training chunks.
         embed_db()
 
@@ -102,7 +103,7 @@ def train_index():
 
 
 def add_to_index():
-    '''Add DB chunks to index.'''
+    """Add DB chunks to index."""
 
     args = get_retro_args()
 
@@ -125,12 +126,12 @@ def add_to_index():
 
 
 def build_index():
-    '''Build index.
+    """Build index.
 
     Building index involves sequentially running stages above:
     - Train index (on sampled training chunks).
     - Add to index (on all training chunks).
-    '''
+    """
 
     # Train index.
     train_index()

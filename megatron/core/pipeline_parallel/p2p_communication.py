@@ -16,9 +16,10 @@ from megatron.core.parallel_state import (
 # Types
 Shape = Union[List[int], torch.Size]
 
-def _communicate_shapes(tensor_send_next, tensor_send_prev,
-                        recv_prev, recv_next,
-                        use_ring_exchange_p2p):
+
+def _communicate_shapes(
+    tensor_send_next, tensor_send_prev, recv_prev, recv_next, use_ring_exchange_p2p
+):
     """Communicate tensor shapes between stages. Used to communicate
     tensor shapes before the actual tensor communication happens.
     This is required when the sequence lengths across micro batches
@@ -42,49 +43,63 @@ def _communicate_shapes(tensor_send_next, tensor_send_prev,
     send_prev_shape_tensor = None
     send_next_shape_tensor = None
     if recv_prev:
-        recv_prev_shape_tensor = torch.empty((3),
-                                             device=torch.cuda.current_device(),
-                                             dtype=torch.int64)
+        recv_prev_shape_tensor = torch.empty(
+            (3), device=torch.cuda.current_device(), dtype=torch.int64
+        )
     if recv_next:
-        recv_next_shape_tensor = torch.empty((3),
-                                             device=torch.cuda.current_device(),
-                                             dtype=torch.int64)
+        recv_next_shape_tensor = torch.empty(
+            (3), device=torch.cuda.current_device(), dtype=torch.int64
+        )
     if tensor_send_prev is not None:
-        send_prev_shape_tensor = torch.tensor(tensor_send_prev.size(),
-                                              device=torch.cuda.current_device(),
-                                              dtype=torch.int64)
+        send_prev_shape_tensor = torch.tensor(
+            tensor_send_prev.size(),
+            device=torch.cuda.current_device(),
+            dtype=torch.int64,
+        )
     if tensor_send_next is not None:
-        send_next_shape_tensor = torch.tensor(tensor_send_next.size(),
-                                              device=torch.cuda.current_device(),
-                                              dtype=torch.int64)
+        send_next_shape_tensor = torch.tensor(
+            tensor_send_next.size(),
+            device=torch.cuda.current_device(),
+            dtype=torch.int64,
+        )
 
     if use_ring_exchange_p2p:
-        torch.distributed.ring_exchange(tensor_send_prev=send_prev_shape_tensor,
-                                        tensor_recv_prev=recv_prev_shape_tensor,
-                                        tensor_send_next=send_next_shape_tensor,
-                                        tensor_recv_next=recv_next_shape_tensor,
-                                        group=mpu.get_pipeline_model_parallel_group())
+        torch.distributed.ring_exchange(
+            tensor_send_prev=send_prev_shape_tensor,
+            tensor_recv_prev=recv_prev_shape_tensor,
+            tensor_send_next=send_next_shape_tensor,
+            tensor_recv_next=recv_next_shape_tensor,
+            group=mpu.get_pipeline_model_parallel_group(),
+        )
     else:
         ops = []
         if send_prev_shape_tensor is not None:
             send_prev_op = torch.distributed.P2POp(
-                torch.distributed.isend, send_prev_shape_tensor,
-                mpu.get_pipeline_model_parallel_prev_rank())
+                torch.distributed.isend,
+                send_prev_shape_tensor,
+                mpu.get_pipeline_model_parallel_prev_rank(),
+            )
             ops.append(send_prev_op)
         if recv_prev_shape_tensor is not None:
             recv_prev_op = torch.distributed.P2POp(
-                torch.distributed.irecv, recv_prev_shape_tensor,
-                mpu.get_pipeline_model_parallel_prev_rank())
+                torch.distributed.irecv,
+                recv_prev_shape_tensor,
+                mpu.get_pipeline_model_parallel_prev_rank(),
+            )
             ops.append(recv_prev_op)
         if send_next_shape_tensor is not None:
             send_next_op = torch.distributed.P2POp(
-                torch.distributed.isend, send_next_shape_tensor,
-                mpu.get_pipeline_model_parallel_next_rank())
+                torch.distributed.isend,
+                send_next_shape_tensor,
+                mpu.get_pipeline_model_parallel_next_rank(),
+            )
             ops.append(send_next_op)
         if recv_next_shape_tensor is not None:
             recv_next_op = torch.distributed.P2POp(
-                torch.distributed.irecv, recv_next_shape_tensor,
-                mpu.get_pipeline_model_parallel_next_rank())
+                torch.distributed.irecv,
+                recv_next_shape_tensor,
+                mpu.get_pipeline_model_parallel_next_rank(),
+            )
             ops.append(recv_next_op)
         if len(ops) > 0:
             reqs = torch.distributed.batch_isend_irecv(ops)
@@ -106,15 +121,17 @@ def _communicate_shapes(tensor_send_next, tensor_send_prev,
     return recv_prev_shape, recv_next_shape
 
 
-def _communicate(*, tensor_send_next: Optional[torch.Tensor],
-                 tensor_send_prev: Optional[torch.Tensor],
-                 recv_prev: bool,
-                 recv_next: bool,
-                 tensor_shape: Shape,
-                 dtype: Optional[torch.dtype],
-                 variable_seq_lengths: bool = False,
-                 use_ring_exchange_p2p: bool = False,
-                 ) -> Tuple[torch.Tensor, torch.Tensor]:
+def _communicate(
+    *,
+    tensor_send_next: Optional[torch.Tensor],
+    tensor_send_prev: Optional[torch.Tensor],
+    recv_prev: bool,
+    recv_next: bool,
+    tensor_shape: Shape,
+    dtype: Optional[torch.dtype],
+    variable_seq_lengths: bool = False,
+    use_ring_exchange_p2p: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """Communicate tensors between stages. Used as helper method in other
     communication methods that are used in megatron/schedules.py.
 
@@ -171,11 +188,9 @@ def _communicate(*, tensor_send_next: Optional[torch.Tensor],
         recv_prev_shape = tensor_shape
         recv_next_shape = tensor_shape
     else:
-        recv_prev_shape, recv_next_shape = \
-            _communicate_shapes(tensor_send_next,
-                                tensor_send_prev,
-                                recv_prev,
-                                recv_next)
+        recv_prev_shape, recv_next_shape = _communicate_shapes(
+            tensor_send_next, tensor_send_prev, recv_prev, recv_next
+        )
 
     if recv_prev:
         if dtype is None:
@@ -185,10 +200,12 @@ def _communicate(*, tensor_send_next: Optional[torch.Tensor],
                 "tensor_shape must be specified if recv_prev is True. "
                 "Common tensor_shape is (seq_length, micro_batch_size, hidden_size)"
             )
-        tensor_recv_prev = torch.empty(recv_prev_shape,
-                                       requires_grad=True,
-                                       device=torch.cuda.current_device(),
-                                       dtype=dtype)
+        tensor_recv_prev = torch.empty(
+            recv_prev_shape,
+            requires_grad=True,
+            device=torch.cuda.current_device(),
+            dtype=dtype,
+        )
     if recv_next:
         if dtype is None:
             raise RuntimeError("dtype must be provided if recv_next is True")
@@ -197,39 +214,51 @@ def _communicate(*, tensor_send_next: Optional[torch.Tensor],
                 "tensor_shape must be specified if recv_next is True. "
                 "Common tensor_shape is (seq_length, micro_batch_size, hidden_size)"
             )
-        tensor_recv_next = torch.empty(recv_next_shape,
-                                       requires_grad=True,
-                                       device=torch.cuda.current_device(),
-                                       dtype=dtype)
+        tensor_recv_next = torch.empty(
+            recv_next_shape,
+            requires_grad=True,
+            device=torch.cuda.current_device(),
+            dtype=dtype,
+        )
 
     # Send tensors in both the forward and backward directions as appropriate.
     if use_ring_exchange_p2p:
-        torch.distributed.ring_exchange(tensor_send_prev=tensor_send_prev,
-                                        tensor_recv_prev=tensor_recv_prev,
-                                        tensor_send_next=tensor_send_next,
-                                        tensor_recv_next=tensor_recv_next,
-                                        group=get_pipeline_model_parallel_group())
+        torch.distributed.ring_exchange(
+            tensor_send_prev=tensor_send_prev,
+            tensor_recv_prev=tensor_recv_prev,
+            tensor_send_next=tensor_send_next,
+            tensor_recv_next=tensor_recv_next,
+            group=get_pipeline_model_parallel_group(),
+        )
     else:
         ops = []
         if tensor_send_prev is not None:
             send_prev_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_prev,
-                get_pipeline_model_parallel_prev_rank())
+                torch.distributed.isend,
+                tensor_send_prev,
+                get_pipeline_model_parallel_prev_rank(),
+            )
             ops.append(send_prev_op)
         if tensor_recv_prev is not None:
             recv_prev_op = torch.distributed.P2POp(
-                torch.distributed.irecv, tensor_recv_prev,
-                get_pipeline_model_parallel_prev_rank())
+                torch.distributed.irecv,
+                tensor_recv_prev,
+                get_pipeline_model_parallel_prev_rank(),
+            )
             ops.append(recv_prev_op)
         if tensor_send_next is not None:
             send_next_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_next,
-                get_pipeline_model_parallel_next_rank())
+                torch.distributed.isend,
+                tensor_send_next,
+                get_pipeline_model_parallel_next_rank(),
+            )
             ops.append(send_next_op)
         if tensor_recv_next is not None:
             recv_next_op = torch.distributed.P2POp(
-                torch.distributed.irecv, tensor_recv_next,
-                get_pipeline_model_parallel_next_rank())
+                torch.distributed.irecv,
+                tensor_recv_next,
+                get_pipeline_model_parallel_next_rank(),
+            )
             ops.append(recv_next_op)
         if len(ops) > 0:
             reqs = torch.distributed.batch_isend_irecv(ops)
@@ -242,10 +271,10 @@ def _communicate(*, tensor_send_next: Optional[torch.Tensor],
     return tensor_recv_prev, tensor_recv_next
 
 
-def recv_forward(tensor_shape: Shape,
-                 dtype: torch.dtype,
-                 timers: Callable = None) -> torch.Tensor:
-    """ Receive tensor from previous rank in pipeline (forward receive).
+def recv_forward(
+    tensor_shape: Shape, dtype: torch.dtype, timers: Callable = None
+) -> torch.Tensor:
+    """Receive tensor from previous rank in pipeline (forward receive).
 
 
     See _communicate for argument details.
@@ -255,22 +284,23 @@ def recv_forward(tensor_shape: Shape,
         input_tensor = None
     else:
         if timers is not None:
-            timers('forward-recv', log_level=2).start()
+            timers("forward-recv", log_level=2).start()
         input_tensor, _ = _communicate(
             tensor_send_next=None,
             tensor_send_prev=None,
             recv_prev=True,
             recv_next=False,
             tensor_shape=tensor_shape,
-            dtype=dtype)
+            dtype=dtype,
+        )
         if timers is not None:
-            timers('forward-recv').stop()
+            timers("forward-recv").stop()
     return input_tensor
 
 
-def recv_backward(tensor_shape: Shape,
-                  dtype: torch.dtype,
-                  timers: Callable = None) -> torch.Tensor:
+def recv_backward(
+    tensor_shape: Shape, dtype: torch.dtype, timers: Callable = None
+) -> torch.Tensor:
     """Receive tensor from next rank in pipeline (backward receive).
 
     See _communicate for argument details.
@@ -279,21 +309,21 @@ def recv_backward(tensor_shape: Shape,
         output_tensor_grad = None
     else:
         if timers is not None:
-            timers('backward-recv', log_level=2).start()
+            timers("backward-recv", log_level=2).start()
         _, output_tensor_grad = _communicate(
             tensor_send_next=None,
             tensor_send_prev=None,
             recv_prev=False,
             recv_next=True,
             tensor_shape=tensor_shape,
-            dtype=dtype)
+            dtype=dtype,
+        )
         if timers is not None:
-            timers('backward-recv').stop()
+            timers("backward-recv").stop()
     return output_tensor_grad
 
 
-def send_forward(output_tensor: torch.Tensor,
-                 timers: Callable = None) -> None:
+def send_forward(output_tensor: torch.Tensor, timers: Callable = None) -> None:
     """Send tensor to next rank in pipeline (forward send).
 
     See _communicate for argument details.
@@ -301,42 +331,45 @@ def send_forward(output_tensor: torch.Tensor,
 
     if not core.parallel_state.is_pipeline_last_stage():
         if timers is not None:
-            timers('forward-send', log_level=2).start()
+            timers("forward-send", log_level=2).start()
         _communicate(
             tensor_send_next=output_tensor,
             tensor_send_prev=None,
             recv_prev=False,
             recv_next=False,
             tensor_shape=None,
-            dtype=None)
+            dtype=None,
+        )
         if timers is not None:
-            timers('forward-send').stop()
+            timers("forward-send").stop()
 
 
-def send_backward(input_tensor_grad: torch.Tensor,
-                  timers: Callable = None) -> None:
+def send_backward(input_tensor_grad: torch.Tensor, timers: Callable = None) -> None:
     """Send tensor to previous rank in pipeline (backward send).
 
     See _communicate for argument details.
     """
     if not core.parallel_state.is_pipeline_first_stage():
         if timers is not None:
-            timers('backward-send', log_level=2).start()
+            timers("backward-send", log_level=2).start()
         _communicate(
             tensor_send_next=None,
             tensor_send_prev=input_tensor_grad,
             recv_prev=False,
             recv_next=False,
             tensor_shape=None,
-            dtype=None)
+            dtype=None,
+        )
         if timers is not None:
-            timers('backward-send').stop()
+            timers("backward-send").stop()
 
 
-def send_forward_recv_backward(output_tensor: torch.Tensor,
-                               tensor_shape: Shape,
-                               dtype: torch.dtype,
-                               timers: Callable = None) -> torch.Tensor:
+def send_forward_recv_backward(
+    output_tensor: torch.Tensor,
+    tensor_shape: Shape,
+    dtype: torch.dtype,
+    timers: Callable = None,
+) -> torch.Tensor:
     """Batched send and recv with next rank in pipeline.
 
     See _communicate for argument details.
@@ -345,23 +378,26 @@ def send_forward_recv_backward(output_tensor: torch.Tensor,
         output_tensor_grad = None
     else:
         if timers is not None:
-            timers('forward-send-backward-recv', log_level=2).start()
+            timers("forward-send-backward-recv", log_level=2).start()
         _, output_tensor_grad = _communicate(
             tensor_send_next=output_tensor,
             tensor_send_prev=None,
             recv_prev=False,
             recv_next=True,
             tensor_shape=tensor_shape,
-            dtype=dtype)
+            dtype=dtype,
+        )
         if timers is not None:
-            timers('forward-send-backward-recv').stop()
+            timers("forward-send-backward-recv").stop()
     return output_tensor_grad
 
 
-def send_backward_recv_forward(input_tensor_grad: torch.Tensor,
-                               tensor_shape: Shape,
-                               dtype: torch.dtype,
-                               timers: Callable = None) -> torch.Tensor:
+def send_backward_recv_forward(
+    input_tensor_grad: torch.Tensor,
+    tensor_shape: Shape,
+    dtype: torch.dtype,
+    timers: Callable = None,
+) -> torch.Tensor:
     """Batched send and recv with previous rank in pipeline.
 
     See _communicate for argument details.
@@ -370,87 +406,95 @@ def send_backward_recv_forward(input_tensor_grad: torch.Tensor,
         input_tensor = None
     else:
         if timers is not None:
-            timers('backward-send-forward-recv', log_level=2).start()
+            timers("backward-send-forward-recv", log_level=2).start()
         input_tensor, _ = _communicate(
             tensor_send_next=None,
             tensor_send_prev=input_tensor_grad,
             recv_prev=True,
             recv_next=False,
             tensor_shape=tensor_shape,
-            dtype=dtype)
+            dtype=dtype,
+        )
         if timers is not None:
-            timers('backward-send-forward-recv').stop()
+            timers("backward-send-forward-recv").stop()
     return input_tensor
 
 
-def send_forward_recv_forward(output_tensor: torch.Tensor,
-                              recv_prev: bool,
-                              tensor_shape: Shape,
-                              dtype: torch.dtype,
-                              timers: Callable = None) -> torch.Tensor:
+def send_forward_recv_forward(
+    output_tensor: torch.Tensor,
+    recv_prev: bool,
+    tensor_shape: Shape,
+    dtype: torch.dtype,
+    timers: Callable = None,
+) -> torch.Tensor:
     """Batched recv from previous rank and send to next rank in pipeline.
 
     See _communicate for argument details.
     """
     if timers is not None:
-        timers('forward-send-forward-recv', log_level=2).start()
+        timers("forward-send-forward-recv", log_level=2).start()
     input_tensor, _ = _communicate(
         tensor_send_next=output_tensor,
         tensor_send_prev=None,
         recv_prev=recv_prev,
         recv_next=False,
         tensor_shape=tensor_shape,
-        dtype=dtype)
+        dtype=dtype,
+    )
     if timers is not None:
-        timers('forward-send-forward-recv').stop()
+        timers("forward-send-forward-recv").stop()
     return input_tensor
 
 
-def send_backward_recv_backward(input_tensor_grad: torch.Tensor,
-                                recv_next: bool,
-                                tensor_shape: Shape,
-                                dtype: torch.dtype,
-                                timers: Callable = None) -> torch.Tensor:
+def send_backward_recv_backward(
+    input_tensor_grad: torch.Tensor,
+    recv_next: bool,
+    tensor_shape: Shape,
+    dtype: torch.dtype,
+    timers: Callable = None,
+) -> torch.Tensor:
     """Batched recv from next rank and send to previous rank in pipeline.
 
     See _communicate for argument details.
     """
     if timers is not None:
-        timers('backward-send-backward-recv', log_level=2).start()
+        timers("backward-send-backward-recv", log_level=2).start()
     _, output_tensor_grad = _communicate(
         tensor_send_next=None,
         tensor_send_prev=input_tensor_grad,
         recv_prev=False,
         recv_next=recv_next,
         tensor_shape=tensor_shape,
-        dtype=dtype)
+        dtype=dtype,
+    )
     if timers is not None:
-        timers('backward-send-backward-recv').stop()
+        timers("backward-send-backward-recv").stop()
     return output_tensor_grad
 
 
 def send_forward_backward_recv_forward_backward(
-        output_tensor: torch.Tensor,
-        input_tensor_grad: torch.Tensor,
-        recv_prev: bool,
-        recv_next: bool,
-        tensor_shape: Shape,
-        dtype: torch.dtype,
-        timers: Callable = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    output_tensor: torch.Tensor,
+    input_tensor_grad: torch.Tensor,
+    recv_prev: bool,
+    recv_next: bool,
+    tensor_shape: Shape,
+    dtype: torch.dtype,
+    timers: Callable = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """Batched send and recv with previous and next ranks in pipeline.
 
     See _communicate for argument details.
     """
     if timers is not None:
-        timers('forward-backward-send-forward-backward-recv',
-               log_level=2).start()
+        timers("forward-backward-send-forward-backward-recv", log_level=2).start()
     input_tensor, output_tensor_grad = _communicate(
         tensor_send_next=output_tensor,
         tensor_send_prev=input_tensor_grad,
         recv_prev=recv_prev,
         recv_next=recv_next,
         tensor_shape=tensor_shape,
-        dtype=dtype)
+        dtype=dtype,
+    )
     if timers is not None:
-        timers('forward-backward-send-forward-backward-recv').stop()
+        timers("forward-backward-send-forward-backward-recv").stop()
     return input_tensor, output_tensor_grad

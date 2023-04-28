@@ -24,14 +24,13 @@ from .faiss_base import FaissBaseIndex
 
 
 class FaissParallelAddIndex(FaissBaseIndex):
-
     def encode_block(self, index, embedder, text_dataset, block):
-        '''Encode sub-dataset block, to be later added to index.
+        """Encode sub-dataset block, to be later added to index.
 
         Encode the data subset, generally in blocks of 1M vectors each. For
         each block, the empty/trained index is loaded, codes are computed
         via index.sa_encode(), and the resulting codes are saved to disk.
-        '''
+        """
 
         args = get_retro_args()
 
@@ -53,7 +52,7 @@ class FaissParallelAddIndex(FaissBaseIndex):
             f.create_dataset("data", data=codes)
 
     def encode(self, text_dataset):
-        '''Encode text dataset, to be later added to index.'''
+        """Encode text dataset, to be later added to index."""
 
         args = get_retro_args()
         codes_dir = get_added_codes_dir()
@@ -62,13 +61,16 @@ class FaissParallelAddIndex(FaissBaseIndex):
         index = self.get_empty_index()
 
         # Bert embedder.
-        embedder = BertEmbedder(args.retro_bert_batch_size,
-                                args.retro_bert_max_chunk_length,
-                                args.bert_embedder_type)
+        embedder = BertEmbedder(
+            args.retro_bert_batch_size,
+            args.retro_bert_max_chunk_length,
+            args.bert_embedder_type,
+        )
 
         # Missing code blocks.
         def validate(f):
             assert len(f["data"].shape) == 2
+
         n_missing_blocks, missing_code_blocks = get_missing_blocks_by_rank(
             codes_dir,
             len(text_dataset),
@@ -78,15 +80,16 @@ class FaissParallelAddIndex(FaissBaseIndex):
 
         # Encode each block.
         for block_index, block in enumerate(missing_code_blocks):
-
             if block is not None:
-
                 # Progress.
-                print_rank_0("encode block %d / %d ... %s." % (
-                    block_index,
-                    len(missing_code_blocks),
-                    block["path"],
-                ))
+                print_rank_0(
+                    "encode block %d / %d ... %s."
+                    % (
+                        block_index,
+                        len(missing_code_blocks),
+                        block["path"],
+                    )
+                )
 
                 # Query block neighbors.
                 self.encode_block(index, embedder, text_dataset, block)
@@ -96,7 +99,6 @@ class FaissParallelAddIndex(FaissBaseIndex):
             torch.distributed.barrier()
 
     def add_codes(self):
-
         if torch.distributed.get_rank() != 0:
             return
 
@@ -125,17 +127,15 @@ class FaissParallelAddIndex(FaissBaseIndex):
         faiss.write_index(index, added_index_path)
 
     def remove_codes(self):
-        '''Remove added codes after adding to index.'''
+        """Remove added codes after adding to index."""
         if torch.distributed.get_rank() != 0:
             return
         assert os.path.isfile(self.get_added_index_path())
         shutil.rmtree(get_added_codes_dir(), ignore_errors=True)
 
     def add(self, text_dataset):
-
         # Check if index already exists.
         if not os.path.isfile(self.get_added_index_path()):
-
             # Encode chunks.
             self.encode(text_dataset)
 

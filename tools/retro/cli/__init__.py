@@ -24,11 +24,10 @@ from tools.retro.utils import get_args_path, get_bert_tokenizer, get_gpt_tokeniz
 
 def shorten_str(s, n):
     s = "\\n".join(s.splitlines())
-    return s if len(s) <= n else "%s ... %s" % (s[:n//2], s[-n//2:])
+    return s if len(s) <= n else "%s ... %s" % (s[: n // 2], s[-n // 2 :])
 
 
 class retro:
-
     args = None
 
     ##############################################
@@ -37,16 +36,16 @@ class retro:
 
     @classmethod
     def init_megatron(cls, workdir):
-        '''Custom initialization of Megatron.'''
+        """Custom initialization of Megatron."""
 
         # Load args.
         args_path = get_args_path(workdir)
         assert os.path.exists(args_path), "args.json not found in workdir."
         with open(args_path) as f:
             cls.args = types.SimpleNamespace(**json.load(f))
-            cls.args.retro_workdir = workdir # just in case workdir moved
-            cls.args.rank = 0 # override env
-            cls.args.world_size = 1 # override env
+            cls.args.retro_workdir = workdir  # just in case workdir moved
+            cls.args.rank = 0  # override env
+            cls.args.world_size = 1  # override env
 
         set_global_variables(cls.args)
         set_retro_args(cls.args)
@@ -55,7 +54,7 @@ class retro:
 
     @classmethod
     def init(cls, workdir):
-        '''Initialize Megatron, tokenizers, and datasets.'''
+        """Initialize Megatron, tokenizers, and datasets."""
 
         # Load args.
         cls.init_megatron(workdir)
@@ -82,12 +81,12 @@ class retro:
 
     @classmethod
     def gpt_to_text(cls, token_ids):
-        '''GPT tokens to text.'''
+        """GPT tokens to text."""
         return cls.tokenizers.gpt.detokenize(token_ids)
 
     @classmethod
     def text_to_bert(cls, text):
-        '''Text to Bert tokens.'''
+        """Text to Bert tokens."""
         return cls.tokenizers.bert.tokenize(text)
 
     ##############################################
@@ -96,14 +95,13 @@ class retro:
 
     @classmethod
     def get_db_num_indexed_datasets(cls):
-        '''Number of indexed datasets within blendable dataset.'''
+        """Number of indexed datasets within blendable dataset."""
         return len(cls.db_indexed_dataset_infos)
 
     @classmethod
     def get_db_indexed_dataset_infos(cls):
-        '''Dataset infos, including number of training & sampled sets.'''
-        return [(info["ratio"], info["name"])
-                for info in cls.db_indexed_dataset_infos]
+        """Dataset infos, including number of training & sampled sets."""
+        return [(info["ratio"], info["name"]) for info in cls.db_indexed_dataset_infos]
 
     @classmethod
     def get_db_dataset(cls):
@@ -111,27 +109,27 @@ class retro:
 
     @classmethod
     def get_db_num_chunks(cls):
-        '''Number of DB chunks.'''
+        """Number of DB chunks."""
         return len(cls.get_db_dataset())
 
     @classmethod
     def get_db_chunk_gpt(cls, idx):
-        '''Get DB chunk as GPT token ids.'''
+        """Get DB chunk as GPT token ids."""
         return cls.get_db_dataset()[idx]["text"].tolist()
 
     @classmethod
     def get_db_chunk_bert(cls, idx):
-        '''Get DB chunk as Bert token ids.'''
+        """Get DB chunk as Bert token ids."""
         return cls.text_to_bert(cls.get_db_chunk_text(idx))
 
     @classmethod
     def get_db_chunk_text(cls, idx):
-        '''Get DB chunk as text.'''
+        """Get DB chunk as text."""
         return cls.gpt_to_text(cls.get_db_chunk_gpt(idx))
 
     @classmethod
     def get_db_chunk_and_continuation_text(cls, idx):
-        '''Get DB chunk along with continuation, as text.'''
+        """Get DB chunk along with continuation, as text."""
 
         # Modulus used here to match original implementation (i.e., last
         # chunks continuation wraps around to first chunk).
@@ -146,10 +144,13 @@ class retro:
 
     @classmethod
     def get_pt_num_samples_and_chunks(cls, data_key):
-        '''Number of samples & chunks (e.g., 32*n_samples) in corpus.'''
-        assert hasattr(cls.pt_datasets, data_key), \
-            "pretraining set '%s' not found (choices: %s)." % (
-                data_key, ", ".join(vars(cls.pt_datasets).keys()))
+        """Number of samples & chunks (e.g., 32*n_samples) in corpus."""
+        assert hasattr(
+            cls.pt_datasets, data_key
+        ), "pretraining set '%s' not found (choices: %s)." % (
+            data_key,
+            ", ".join(vars(cls.pt_datasets).keys()),
+        )
         chunk_dataset = getattr(cls.pt_datasets, data_key).chunk_dataset
         return (
             len(chunk_dataset.sample_dataset),
@@ -158,12 +159,12 @@ class retro:
 
     @classmethod
     def get_pt_num_samples(cls, data_key):
-        '''Number of pretraining samples.'''
+        """Number of pretraining samples."""
         return cls.get_pt_num_samples_and_chunks(data_key)[0]
 
     @classmethod
     def get_pt_num_chunks(cls, data_key):
-        '''Number of pretraining chunks (e.g., 32*n_samples).'''
+        """Number of pretraining chunks (e.g., 32*n_samples)."""
         return cls.get_pt_num_samples_and_chunks(data_key)[1]
 
     @classmethod
@@ -176,7 +177,7 @@ class retro:
 
     @classmethod
     def print_usage(cls):
-        '''Print usage.'''
+        """Print usage."""
 
         print()
         print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
@@ -185,16 +186,21 @@ class retro:
 
         print()
         print("~~~~ indexed datasets ~~~~")
-        print("retro.get_db_num_indexed_datasets() : %s" %
-              cls.get_db_num_indexed_datasets())
+        print(
+            "retro.get_db_num_indexed_datasets() : %s"
+            % cls.get_db_num_indexed_datasets()
+        )
         print("retro.get_db_indexed_dataset_infos() :")
-        for i, (ratio,prefix) in enumerate(cls.get_db_indexed_dataset_infos()):
-            print("  %s(%f, %s)%s" % (
-                "[" if i == 0 else " ",
-                ratio,
-                prefix,
-                "]" if i == len(cls.db_indexed_dataset_infos) - 1 else ",",
-            ))
+        for i, (ratio, prefix) in enumerate(cls.get_db_indexed_dataset_infos()):
+            print(
+                "  %s(%f, %s)%s"
+                % (
+                    "[" if i == 0 else " ",
+                    ratio,
+                    prefix,
+                    "]" if i == len(cls.db_indexed_dataset_infos) - 1 else ",",
+                )
+            )
 
         print()
         print("~~~~ counts ~~~~")
@@ -202,26 +208,40 @@ class retro:
 
         print()
         for sq_key in ("sample", "chunk"):
-            for data_key in ("train", "valid"): # test?
-                print("retro.get_pt_num_%ss('%s') : %d." % (
-                    sq_key, data_key,
-                    getattr(cls, f"get_pt_num_{sq_key}s")(data_key)))
+            for data_key in ("train", "valid"):  # test?
+                print(
+                    "retro.get_pt_num_%ss('%s') : %d."
+                    % (
+                        sq_key,
+                        data_key,
+                        getattr(cls, f"get_pt_num_{sq_key}s")(data_key),
+                    )
+                )
 
         print()
         print("~~~~ tokens, text ~~~~")
-        print("retro.get_db_chunk_gpt(chunk_id) : %s" %
-              shorten_str(str(retro.get_db_chunk_gpt(0)), 50))
-        print("retro.get_db_chunk_bert(chunk_id) : %s" %
-              shorten_str(str(retro.get_db_chunk_bert(0)), 50))
-        print("retro.get_db_chunk_text(chunk_id) : %s" %
-              shorten_str(retro.get_db_chunk_text(0).strip(), 50))
+        print(
+            "retro.get_db_chunk_gpt(chunk_id) : %s"
+            % shorten_str(str(retro.get_db_chunk_gpt(0)), 50)
+        )
+        print(
+            "retro.get_db_chunk_bert(chunk_id) : %s"
+            % shorten_str(str(retro.get_db_chunk_bert(0)), 50)
+        )
+        print(
+            "retro.get_db_chunk_text(chunk_id) : %s"
+            % shorten_str(retro.get_db_chunk_text(0).strip(), 50)
+        )
         print("retro.get_db_chunk_and_continuation_text(chunk_id) :")
         for i, t in enumerate(retro.get_db_chunk_and_continuation_text(0)):
-            print("  %s'%s'%s" % (
-                "[" if i == 0 else " ",
-                shorten_str(t.strip().replace("\n", " "), 50),
-                "]" if i == 1 else ",",
-            ))
+            print(
+                "  %s'%s'%s"
+                % (
+                    "[" if i == 0 else " ",
+                    shorten_str(t.strip().replace("\n", " "), 50),
+                    "]" if i == 1 else ",",
+                )
+            )
 
         sample = cls.get_pt_sample("train", 0)
         print()
@@ -235,10 +255,22 @@ class retro:
         print("(e.g., sample = retro.get_pt_sample(...))")
         print()
         print("  sample['text'].shape : %s" % str(sample["text"].shape))
-        print("  sample['neighbor_tokens'].shape : %s" % str(sample["neighbor_tokens"].shape))
+        print(
+            "  sample['neighbor_tokens'].shape : %s"
+            % str(sample["neighbor_tokens"].shape)
+        )
         print("  sample['text'] : %s" % shorten_str(str(sample["text"]), 50))
-        print("  sample['neighbor_tokens'][17][1] : %s" % shorten_str(str(sample["neighbor_tokens"][17][1]), 50))
-        print("  retro.gpt_to_text(sample['text']) : %s" % shorten_str(cls.gpt_to_text(sample["text"]), 50))
-        print("  retro.gpt_to_text(sample['neighbor_tokens']) : %s" % shorten_str(cls.gpt_to_text(sample["neighbor_tokens"][17][1]), 50))
+        print(
+            "  sample['neighbor_tokens'][17][1] : %s"
+            % shorten_str(str(sample["neighbor_tokens"][17][1]), 50)
+        )
+        print(
+            "  retro.gpt_to_text(sample['text']) : %s"
+            % shorten_str(cls.gpt_to_text(sample["text"]), 50)
+        )
+        print(
+            "  retro.gpt_to_text(sample['neighbor_tokens']) : %s"
+            % shorten_str(cls.gpt_to_text(sample["neighbor_tokens"][17][1]), 50)
+        )
 
         print("+++++++++++++++++++++++++++++++++++++++++++++++++++")

@@ -20,9 +20,8 @@ from tools.retro.index.utils import num_samples_to_block_ranges
 
 
 class FaissBaseIndex(Index):
-
     def _train(self, input_data_loader):
-        '''Train index (rank 0's method).'''
+        """Train index (rank 0's method)."""
 
         args = get_retro_args()
 
@@ -43,13 +42,11 @@ class FaissBaseIndex(Index):
         inp = input_data_loader()
 
         # Init index.
-        index = faiss.index_factory(args.retro_index_nfeats,
-                                    args.retro_index_str)
+        index = faiss.index_factory(args.retro_index_nfeats, args.retro_index_str)
 
         # Move to GPU.
         index_ivf = faiss.extract_index_ivf(index)
-        clustering_index = \
-            faiss.index_cpu_to_all_gpus(faiss.IndexFlatL2(index_ivf.d))
+        clustering_index = faiss.index_cpu_to_all_gpus(faiss.IndexFlatL2(index_ivf.d))
         index_ivf.clustering_index = clustering_index
         self.c_verbose(index, True)
         self.c_verbose(index_ivf, True)
@@ -63,7 +60,7 @@ class FaissBaseIndex(Index):
         faiss.write_index(index, empty_index_path)
 
     def train(self, input_data_loader):
-        '''Train index.'''
+        """Train index."""
 
         # Single process only.
         if torch.distributed.get_rank() == 0:
@@ -72,7 +69,7 @@ class FaissBaseIndex(Index):
         torch.distributed.barrier()
 
     def _add(self, text_dataset):
-        '''Add to index (rank 0's method).'''
+        """Add to index (rank 0's method)."""
 
         assert torch.distributed.get_rank() == 0
 
@@ -84,9 +81,11 @@ class FaissBaseIndex(Index):
         faiss.omp_set_num_threads(64)
 
         # Bert embedder.
-        embedder = BertEmbedder(args.retro_bert_batch_size,
-                                args.retro_bert_max_chunk_length,
-                                args.bert_embedder_type)
+        embedder = BertEmbedder(
+            args.retro_bert_batch_size,
+            args.retro_bert_max_chunk_length,
+            args.bert_embedder_type,
+        )
 
         # Empty/added index paths.
         empty_index_path = self.get_empty_index_path()
@@ -101,10 +100,8 @@ class FaissBaseIndex(Index):
 
         # Iterate data blocks & add.
         for sample_range in tqdm(dataset_sample_ranges, "faiss_base.add"):
-
             # Embed text.
-            embeds = self.embed_text_dataset_block(
-                embedder, text_dataset, sample_range)
+            embeds = self.embed_text_dataset_block(embedder, text_dataset, sample_range)
 
             # Add to index.
             index.add(embeds)
@@ -113,7 +110,7 @@ class FaissBaseIndex(Index):
         faiss.write_index(index, added_index_path)
 
     def add(self, text_dataset):
-        '''Add to index.'''
+        """Add to index."""
 
         # Single process only.
         if torch.distributed.get_rank() == 0:

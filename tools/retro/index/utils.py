@@ -35,8 +35,8 @@ def get_index_dir():
 
 
 def num_samples_to_block_ranges(num_samples):
-    '''Split a range (length num_samples) into sequence of block ranges
-    of size block_size.'''
+    """Split a range (length num_samples) into sequence of block ranges
+    of size block_size."""
     args = get_retro_args()
     block_size = args.retro_block_size
     start_idxs = list(range(0, num_samples, block_size))
@@ -62,7 +62,6 @@ def get_added_code_paths():
 
 
 def get_training_data_group_infos():
-
     args = get_retro_args()
 
     block_paths = get_training_data_paths()
@@ -78,17 +77,21 @@ def get_training_data_group_infos():
         group_size += block_size
 
         if group_size >= max_group_size:
-            groups.append({
-                "paths" : group,
-                "size" : group_size,
-            })
+            groups.append(
+                {
+                    "paths": group,
+                    "size": group_size,
+                }
+            )
             group = []
             group_size = 0
     if group:
-        groups.append({
-            "paths" : group,
-            "size" : group_size,
-        })
+        groups.append(
+            {
+                "paths": group,
+                "size": group_size,
+            }
+        )
 
     return groups
 
@@ -100,7 +103,6 @@ def load_training_block(path, load_fraction):
 
 
 def load_training_group(executor, group_info, load_fraction):
-
     # Launch threads to load block data.
     futures = []
     for path in group_info["paths"]:
@@ -123,7 +125,7 @@ def load_training_group(executor, group_info, load_fraction):
 
 
 def get_training_data_merged():
-    '''Merge embeddings into single dataset.'''
+    """Merge embeddings into single dataset."""
 
     args = get_retro_args()
 
@@ -144,21 +146,22 @@ def get_training_data_merged():
     # Load data blocks.
     n_threads = max(len(group["paths"]) for group in group_infos)
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_threads) as executor:
-
         # Load data blocks.
         print("load training data blocks.")
         start_idx = 0
         pbar = tqdm(group_infos)
         for group_info in pbar:
-
-            pbar.set_description("mem %.0f gb, %.1f%%" % (
-                psutil.virtual_memory()[3] / 1024**3,
-                psutil.virtual_memory()[2],
-            ))
+            pbar.set_description(
+                "mem %.0f gb, %.1f%%"
+                % (
+                    psutil.virtual_memory()[3] / 1024**3,
+                    psutil.virtual_memory()[2],
+                )
+            )
 
             # Load group data.
             group_data = load_training_group(executor, group_info, load_fraction)
-            data[start_idx:(start_idx+len(group_data))] = group_data
+            data[start_idx : (start_idx + len(group_data))] = group_data
             start_idx += len(group_data)
 
             # Garbage collect.
