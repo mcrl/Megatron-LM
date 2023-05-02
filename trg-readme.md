@@ -7,7 +7,7 @@
 
 ```bash
 conda activate trg-megatron
-conda install python=3.10 numpy<1.20 -y
+conda install python=3.9 numpy<1.20 -y
 conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia -y
 ```
 
