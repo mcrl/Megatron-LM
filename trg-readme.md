@@ -24,10 +24,8 @@ pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp
 popd
 ```
 
-## Installing `nltk`
-
-`nltk` is required for data preprocessment
+## Installing packages for preprocessment
 
 ```bash
-pip install nltk
+pip install nltk six
 ```
